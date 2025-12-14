@@ -1,4 +1,4 @@
-module task-facade
+module github.com/crackeer/task-facade 
 
 go 1.23.5
 

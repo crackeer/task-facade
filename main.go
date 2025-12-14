@@ -1,7 +1,7 @@
 package main
 
 import (
-	"task-facade/server"
+	"github.com/crackeer/task-facade/server"
 )
 
 func main() {
