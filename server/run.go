@@ -44,7 +44,7 @@ func runTask(ctx *gin.Context) {
 		return
 	}
 	if len(result) > 0 {
-		printMessage("output: " + result)
+		printMessage("task result: " + result)
 	}
 }
 
