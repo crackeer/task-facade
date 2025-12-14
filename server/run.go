@@ -46,8 +46,6 @@ func runTask(ctx *gin.Context) {
 	if len(result) > 0 {
 		printMessage("output: " + result)
 	}
-	printMessage("")
-	printMessage("Task completed successfully")
 }
 
 func newPrintMessage(ctx *gin.Context) func(string) {
