@@ -1,0 +1,63 @@
+package server
+
+import (
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+)
+
+func runTask(ctx *gin.Context) {
+	// 设置SSE头部
+	ctx.Header("Content-Type", "text/event-stream")
+	ctx.Header("Cache-Control", "no-cache")
+	ctx.Header("Connection", "keep-alive")
+	ctx.Header("Transfer-Encoding", "chunked")
+	tool := ctx.Param("tool")
+
+	var (
+		result string
+		err    error
+	)
+	defer func() {
+		closeSSE(ctx, result)
+	}()
+
+	var printMessage func(string) = newPrintMessage(ctx)
+
+	if tool == "" {
+		printMessage("tool is required")
+		return
+	}
+
+	toolFunc, ok := toolMapping[tool]
+	if !ok {
+		printMessage(fmt.Sprintf("tool %s not found", tool))
+		return
+	}
+
+	input := getInput(ctx)
+
+	result, err = toolFunc(input, printMessage)
+	if err != nil {
+		printMessage("")
+		printMessage(fmt.Sprintf("failed to run task: %v", err))
+		return
+	}
+	if len(result) > 0 {
+		printMessage("output: " + result)
+	}
+	printMessage("")
+	printMessage("Task completed successfully")
+}
+
+func newPrintMessage(ctx *gin.Context) func(string) {
+	return func(msg string) {
+		ctx.SSEvent("message", msg)
+		ctx.Writer.Flush()
+	}
+}
+
+func closeSSE(ctx *gin.Context, msg string) {
+	ctx.SSEvent("close", msg)
+	ctx.Writer.Flush()
+}
