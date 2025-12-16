@@ -33,8 +33,8 @@ func Run(tools map[string]func(string, func(string)) (string, error), port strin
 	// 创建 Gin 实例
 	router := gin.Default()
 	router.Use(enableCORS)
-	router.POST("/input", createInput)
 	router.GET("/run/:tool", runTask)
+	router.GET("/quick_run/:tool", quickRunTask)
 
 	if len(port) < 1 {
 		if value, ok := os.LookupEnv("PORT"); ok {

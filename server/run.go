@@ -1,61 +1,99 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func runTask(ctx *gin.Context) {
-	// 设置SSE头部
-	ctx.Header("Content-Type", "text/event-stream")
-	ctx.Header("Cache-Control", "no-cache")
-	ctx.Header("Connection", "keep-alive")
-	ctx.Header("Transfer-Encoding", "chunked")
 	tool := ctx.Param("tool")
-
-	var (
-		result string
-		err    error
-	)
-	defer func() {
-		closeSSE(ctx, result)
-	}()
-
-	var printMessage func(string) = newPrintMessage(ctx)
+	query, err := queruQuery(ctx)
 
 	if tool == "" {
-		printMessage("tool is required")
+		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("tool is required"))
 		return
 	}
 
 	toolFunc, ok := toolMapping[tool]
 	if !ok {
-		printMessage(fmt.Sprintf("tool %s not found", tool))
+		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("tool %s not found", tool))
 		return
 	}
 
-	input := getInput(ctx)
-
-	result, err = toolFunc(input, printMessage)
 	if err != nil {
-		printMessage("")
-		printMessage(fmt.Sprintf("failed to run task: %v", err))
+		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	if len(result) > 0 {
-		printMessage("task result: " + result)
+
+	if err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
+
+	go func(queryData Query, tempFunc func(string, func(string)) (string, error)) {
+		callback(queryData.Callback, "running", "task is running")
+		result, err := executeTask(queryData, tempFunc)
+		if err != nil {
+			callback(queryData.Callback, "failed", err.Error())
+			return
+		}
+		if len(result) > 0 {
+			callback(queryData.Callback, "success", result)
+		}
+	}(query, toolFunc)
+
+	ctx.JSON(http.StatusOK, nil)
 }
 
-func newPrintMessage(ctx *gin.Context) func(string) {
+func executeTask(queryData Query, tempFunc func(string, func(string)) (string, error)) (string, error) {
+	input, err := getInputData(queryData.Input)
+	if err != nil {
+		return "", err
+	}
+	outputMessage := newOutputMessage(queryData.Output)
+	return tempFunc(input, outputMessage)
+}
+
+func newOutputMessage(outputURL string) func(string) {
 	return func(msg string) {
-		ctx.SSEvent("message", msg)
-		ctx.Writer.Flush()
+		_, err := http.Post(outputURL, "text/plain", strings.NewReader(msg))
+		if err != nil {
+			fmt.Printf("failed to send message to %s: %v", outputURL, err)
+		}
 	}
 }
 
-func closeSSE(ctx *gin.Context, msg string) {
-	ctx.SSEvent("close", msg)
-	ctx.Writer.Flush()
+func getInputData(inputURL string) (string, error) {
+	httpResp, err := http.Get(inputURL)
+	if err != nil {
+		return "", err
+	}
+	defer httpResp.Body.Close()
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+func callback(callbackURL string, status, message string) error {
+	if callbackURL == "" {
+		return nil
+	}
+	postBody := map[string]string{
+		"status":  status,
+		"message": message,
+	}
+	bytes, err := json.Marshal(postBody)
+	if err != nil {
+		return err
+	}
+
+	_, err = http.Post(callbackURL, "application/json", strings.NewReader(string(bytes)))
+	return err
 }
