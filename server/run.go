@@ -12,26 +12,11 @@ import (
 
 func runTask(ctx *gin.Context) {
 	tool := ctx.Param("tool")
-	query, err := queruQuery(ctx)
-
-	if tool == "" {
-		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("tool is required"))
-		return
-	}
+	query, _ := queruQuery(ctx)
 
 	toolFunc, ok := toolMapping[tool]
 	if !ok {
 		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("tool %s not found", tool))
-		return
-	}
-
-	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
-		return
-	}
-
-	if err != nil {
-		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
@@ -47,11 +32,12 @@ func runTask(ctx *gin.Context) {
 		}
 	}(query, toolFunc)
 
-	ctx.JSON(http.StatusOK, nil)
+	ctx.JSON(http.StatusOK, map[string]string{"message": "running"})
 }
 
 func executeTask(queryData Query, tempFunc func(string, func(string)) (string, error)) (string, error) {
 	input, err := getInputData(queryData.Input)
+	fmt.Printf("input: %s", input)
 	if err != nil {
 		return "", err
 	}

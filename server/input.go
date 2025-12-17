@@ -12,8 +12,10 @@ type Query struct {
 
 func queruQuery(ctx *gin.Context) (Query, error) {
 	var query Query
-	err := ctx.BindQuery(&query)
-	return query, err
+	query.Input = ctx.Query("input")
+	query.Output = ctx.Query("output")
+	query.Callback = ctx.Query("callback")
+	return query, nil
 }
 
 func queryAll(ctx *gin.Context) map[string]string {
