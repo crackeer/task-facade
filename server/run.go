@@ -47,6 +47,7 @@ func executeTask(queryData Query, tempFunc func(string, func(string)) (string, e
 
 func newOutputMessage(outputURL string) func(string) {
 	return func(msg string) {
+		fmt.Printf("output: %s\n", msg)
 		_, err := http.Post(outputURL, "text/plain", strings.NewReader(msg))
 		if err != nil {
 			log.Printf("failed to send message to %s: %v", outputURL, err)
