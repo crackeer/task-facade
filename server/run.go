@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 func runTask(ctx *gin.Context) {
 	tool := ctx.Param("tool")
 	query, _ := queruQuery(ctx)
-
 	toolFunc, ok := toolMapping[tool]
 	if !ok {
 		ctx.AbortWithError(http.StatusBadRequest, fmt.Errorf("tool %s not found", tool))
@@ -35,7 +35,7 @@ func runTask(ctx *gin.Context) {
 
 func executeTask(queryData Query, tempFunc func(string, func(string)) (string, error)) (string, error) {
 	input, err := getInputData(queryData.Input)
-	fmt.Printf("input: %s", input)
+	log.Printf("input: %s", input)
 	if err != nil {
 		return "", err
 	}
@@ -45,16 +45,19 @@ func executeTask(queryData Query, tempFunc func(string, func(string)) (string, e
 
 func newOutputMessage(outputURL string) func(string) {
 	return func(msg string) {
+		fmt.Printf("output: %s\n", msg)
 		_, err := http.Post(outputURL, "text/plain", strings.NewReader(msg))
 		if err != nil {
-			fmt.Printf("failed to send message to %s: %v", outputURL, err)
+			log.Printf("failed to send message to %s: %v", outputURL, err)
 		}
 	}
 }
 
 func getInputData(inputURL string) (string, error) {
+	log.Printf("get input data from %s", inputURL)
 	httpResp, err := http.Get(inputURL)
 	if err != nil {
+		log.Printf("failed to get input data from %s: %v", inputURL, err)
 		return "", err
 	}
 	defer httpResp.Body.Close()
@@ -66,6 +69,7 @@ func getInputData(inputURL string) (string, error) {
 }
 
 func callback(callbackURL string, status, message string) error {
+	log.Printf("callback to %s, status: %s, message: %s", callbackURL, status, message)
 	if callbackURL == "" {
 		return nil
 	}
@@ -75,9 +79,14 @@ func callback(callbackURL string, status, message string) error {
 	}
 	bytes, err := json.Marshal(postBody)
 	if err != nil {
+		log.Printf("failed to marshal callback body: %v", err)
 		return err
 	}
 
 	_, err = http.Post(callbackURL, "application/json", strings.NewReader(string(bytes)))
-	return err
+	if err != nil {
+		log.Printf("failed to post callback to %s: %v", callbackURL, err)
+		return err
+	}
+	return nil
 }
