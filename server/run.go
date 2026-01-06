@@ -27,9 +27,7 @@ func runTask(ctx *gin.Context) {
 			callback(queryData.Callback, "failed", err.Error())
 			return
 		}
-		if len(result) > 0 {
-			callback(queryData.Callback, "success", result)
-		}
+		callback(queryData.Callback, "success", result)
 	}(query, toolFunc)
 
 	ctx.JSON(http.StatusOK, map[string]string{"message": "running"})
