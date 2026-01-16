@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,9 +45,25 @@ func executeTask(queryData Query, tempFunc func(string, func(string)) (string, e
 }
 
 func newOutputMessage(outputURL string) func(string) {
+	client := &http.Client{
+		Timeout: time.Second * 5,
+		Transport: &http.Transport{
+			DisableCompression:  false,
+			DisableKeepAlives:   false,
+			MaxIdleConns:        100,
+			IdleConnTimeout:     time.Second * 90,
+			MaxIdleConnsPerHost: 100,
+		},
+	}
 	return func(msg string) {
 		fmt.Printf("output: %s\n", msg)
-		_, err := http.Post(outputURL, "text/plain", strings.NewReader(msg))
+		req, err := http.NewRequest(http.MethodPost, outputURL, strings.NewReader(msg))
+		if err != nil {
+			log.Printf("failed to create request to %s: %v", outputURL, err)
+			return
+		}
+		req.Header.Set("Content-Type", "text/plain")
+		_, err = client.Do(req)
 		if err != nil {
 			log.Printf("failed to send message to %s: %v", outputURL, err)
 		}
